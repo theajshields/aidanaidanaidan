@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/@macrowave/player@latest"></script>
+
+<style>
+  :root {
+    --header-bg: light-dark(#f0f0f0, #1f1f1f);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    
+    /* This centers the "main-container" in the middle of the screen */
+    display: flex;
+    justify-content: center; 
+    align-items: center;     
+
+    background-color: #000;
+    background: 
+      linear-gradient(0deg, rgba(0,0,0,1), rgba(50,0,0,1)),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='7.76' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  /* This new container stacks the player and the logo vertically */
+  .main-container {
+    display: flex;
+    flex-direction: column; /* Stacks items top to bottom */
+    align-items: center;    /* Centers them horizontally */
+    gap: 20px;              /* Adds space between player and logo */
+  }
+
+  macrowave-player {
+    filter: contrast(100%) brightness(100%);
+    max-width: 90vw;
+  }
+
+  /* Styles for the Apple Logo */
+  .app-badge {
+    width: 100px;  /* Makes the logo smaller */
+    height: auto;  /* Maintains aspect ratio */
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .app-badge:hover {
+    opacity: 0.8; /* Slight fade effect on hover */
+  }
+</style>
+</head>
+<body>
+
+  <div class="main-container">
+    
+    <macrowave-player
+      station="aidan/aidanaidanaidan"
+      theme="dark">
+    </macrowave-player>
+    <br>
+    <a href="https://apps.apple.com/app/apple-store/id6746954963?pt=123127751&ct=macrowave.co&mt=8" target="_blank">
+      <img class="app-badge" src="https://macrowave.co/images/app-store-badge.svg" alt="Download on the App Store">
+    </a>
+
+  </div>
+
+</body>
+</html>
