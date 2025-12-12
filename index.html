@@ -62,7 +62,8 @@
   /* making sure the player takes up space, even if the web component acts weird */
   macrowave-player {
     display: block; 
-    filter: contrast(100%) brightness(100%);
+    filter: contrast(110%) brightness(95%) hue-rotate(-100deg) saturate(250%);
+
     max-width: 100%;
     width: 100%;
   }
@@ -102,8 +103,8 @@
 
 <script>
   // --- config stuff ---
-  const TARGET_GREEN_RGB = 'rgb(106, 223, 71)';
-  const REPLACE_RED_RGB = 'rgb(188, 37, 36)';
+  const TARGET_GREEN_RGB = 'rgb(255, 107, 53)';
+  const REPLACE_RED_RGB = 'rgb(106, 223, 78)';
   const REPLACE_RED_HEX = '#bc2524';
 
   // this css is super important! it gets injected inside the player's secret shadow dom
