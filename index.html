@@ -11,7 +11,7 @@
 <meta name='twitter:description' content='listen to aidanaidanaidan_radio' />
 <meta name='twitter:image' content='/aidan.webp' />
 <meta name='twitter:image:alt' content='thumbnail' />
-<link rel="icon" type="image/x-icon" href="/favicon.webp">
+<link rel="icon" type="image/x-icon" href="/favicon.png">
 <script src="https://cdn.jsdelivr.net/npm/@macrowave/player@latest"></script>
 
 <style>
@@ -19,30 +19,19 @@
     --header-bg: light-dark(#f0f0f0, #1f1f1f);
   }
 
-  /* --- CHANGE 1: Apply the background to the html element --- */
-  html {
-    /* Ensure html covers the whole screen height */
-    min-height: 100%;
-    
-    /* Apply the dark background to catch overscrolling areas */
-    background-color: #000;
-    background:
-      linear-gradient(0deg, rgba(0,0,0,1), rgba(51,10,9,1)),
-      url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='7.76' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  }
-
   body {
     margin: 0;
-    /* Ensure body stretches to the full height of the HTML container */
-    min-height: 100vh; 
-    
+    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 20px;
     overflow-x: hidden;
     
-    /* REMOVED background-color and background from body */
+    background-color: #000;
+    background:
+      linear-gradient(0deg, rgba(0,0,0,1), rgba(51,10,9,1)),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='7.76' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
   }
 
   .zoom-wrapper {
@@ -73,8 +62,7 @@
   /* making sure the player takes up space, even if the web component acts weird */
   macrowave-player {
     display: block; 
-    filter: contrast(110%) brightness(95%) hue-rotate(-100deg) saturate(250%);
-
+    filter: contrast(100%) brightness(100%);
     max-width: 100%;
     width: 100%;
   }
@@ -84,7 +72,7 @@
   }
   
   .app-badge {
-    width: clamp(75px, 15vw, 90px);
+    width: clamp(80px, 15vw, 150px);
     height: auto;
     cursor: pointer;
     transition: opacity 0.2s;
@@ -114,8 +102,8 @@
 
 <script>
   // --- config stuff ---
-  const TARGET_GREEN_RGB = 'rgb(255, 107, 53)';
-  const REPLACE_RED_RGB = 'rgb(106, 223, 78)';
+  const TARGET_GREEN_RGB = 'rgb(106, 223, 71)';
+  const REPLACE_RED_RGB = 'rgb(188, 37, 36)';
   const REPLACE_RED_HEX = '#bc2524';
 
   // this css is super important! it gets injected inside the player's secret shadow dom
@@ -155,17 +143,107 @@
     root.appendChild(styleTag);
     console.log("injected the red css stylesheet successfully!");
 
-    // 4. this is the core function to swap those annoying inline rgb styles
+    // 4. robust function to swap inline colors that look 'greenish' or 'orange-ish' into our red
     const swapInlineStyles = (node) => {
-        if (node.nodeType !== 1) return; // skip text and comments
-        
-        const styleText = node.getAttribute('style');
-        if (styleText && styleText.includes(TARGET_GREEN_RGB)) {
-            // replacing all instances of the green rgb with the red rgb
-            const newStyle = styleText.replace(new RegExp(TARGET_GREEN_RGB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), REPLACE_RED_RGB);
-            node.setAttribute('style', newStyle);
-            console.log(`hacked the inline style on <${node.tagName}>. it's red now.`);
+      if (!node || node.nodeType !== 1) return; // skip text and comments
+
+      const styleText = node.getAttribute('style');
+      let newStyle = styleText || '';
+      let replaced = false;
+
+      // helper: decide if a color is greenish enough to replace
+      const isGreenish = (r, g, b) => {
+        return (g > r + 18) && (g > b + 18) && (g >= 80);
+      };
+
+      // helper: decide if a color is orange-ish (for sound bars)
+      const isOrangeish = (r, g, b) => {
+        // orange typically: red high, green moderate, blue low
+        return (r > g + 30) && (g > b + 15) && (r >= 140);
+      };
+
+      // parse and replace rgb(...) occurrences
+      const rgbRegex = /rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/gi;
+      newStyle = newStyle.replace(rgbRegex, (match, rs, gs, bs) => {
+        const r = parseInt(rs, 10), g = parseInt(gs, 10), b = parseInt(bs, 10);
+        if (isGreenish(r, g, b) || isOrangeish(r, g, b)) {
+          replaced = true;
+          return REPLACE_RED_RGB;
         }
+        return match;
+      });
+
+      // parse and replace hex colors (#rrggbb or #rgb)
+      const hexRegex = /#([0-9a-f]{3}|[0-9a-f]{6})/gi;
+      newStyle = newStyle.replace(hexRegex, (match, hex) => {
+        try {
+          let r, g, b;
+          if (hex.length === 3) {
+            r = parseInt(hex[0] + hex[0], 16);
+            g = parseInt(hex[1] + hex[1], 16);
+            b = parseInt(hex[2] + hex[2], 16);
+          } else {
+            r = parseInt(hex.slice(0,2), 16);
+            g = parseInt(hex.slice(2,4), 16);
+            b = parseInt(hex.slice(4,6), 16);
+          }
+          if (isGreenish(r, g, b) || isOrangeish(r, g, b)) {
+            replaced = true;
+            return REPLACE_RED_HEX;
+          }
+        } catch (e) {
+          // ignore parse issues
+        }
+        return match;
+      });
+
+      // If style attribute changed, write it back
+      if (replaced && styleText) {
+        node.setAttribute('style', newStyle);
+        console.log(`hacked the inline style on <${node.tagName}>. replaced green/orange colors.`);
+      }
+
+      // Additionally check common SVG attributes like fill/stroke and generic color attributes
+      ['fill', 'stroke', 'color', 'background', 'background-color'].forEach(attr => {
+        try {
+          const val = node.getAttribute && node.getAttribute(attr);
+          if (!val) return;
+
+          // check rgb(...) in attribute
+          let m = rgbRegex.exec(val);
+          rgbRegex.lastIndex = 0;
+          if (m) {
+            const r = parseInt(m[1], 10), g = parseInt(m[2], 10), b = parseInt(m[3], 10);
+            if (isGreenish(r, g, b) || isOrangeish(r, g, b)) {
+              node.setAttribute(attr, REPLACE_RED_RGB);
+              console.log(`replaced ${attr} rgb on <${node.tagName}>`);
+            }
+            return;
+          }
+
+          // check hex in attribute
+          const hexMatch = val.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+          if (hexMatch) {
+            let hex = hexMatch[1].toLowerCase();
+            let rr, gg, bb;
+            if (hex.length === 3) {
+              rr = parseInt(hex[0] + hex[0], 16);
+              gg = parseInt(hex[1] + hex[1], 16);
+              bb = parseInt(hex[2] + hex[2], 16);
+            } else {
+              rr = parseInt(hex.slice(0,2), 16);
+              gg = parseInt(hex.slice(2,4), 16);
+              bb = parseInt(hex.slice(4,6), 16);
+            }
+            if (isGreenish(rr, gg, bb) || isOrangeish(rr, gg, bb)) {
+              node.setAttribute(attr, REPLACE_RED_HEX);
+              console.log(`replaced ${attr} hex on <${node.tagName}>`);
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      });
     };
 
     // 5. setting up the mutation observer (the 'security camera')
@@ -191,6 +269,122 @@
     
     // running an initial check on existing elements just in case
     root.querySelectorAll('*').forEach(swapInlineStyles);
+
+    // 6. Marquee for bottom dark-gray text when it overflows
+    // Helper: determine if a color string is a dark gray we care about
+    function parseRgbString(s) {
+      const m = String(s).match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+      if (!m) return null;
+      return [parseInt(m[1],10), parseInt(m[2],10), parseInt(m[3],10)];
+    }
+
+    function isDarkGrayColorString(s) {
+      const rgb = parseRgbString(s);
+      if (!rgb) return false;
+      const [r,g,b] = rgb;
+      // require near-equal components (it's gray), and fairly dark but not black
+      const eq = Math.abs(r-g) <= 12 && Math.abs(r-b) <= 12 && Math.abs(g-b) <= 12;
+      const dark = r >= 30 && r <= 110; // mid-dark range
+      return eq && dark;
+    }
+
+    function isOverflowing(el) {
+      try { return el.scrollWidth > (el.clientWidth || el.offsetWidth) + 1; } catch (e) { return false; }
+    }
+
+    // Create marquee structure inside a container element
+    function createMarquee(container) {
+      if (!container) return;
+      if (container.querySelector('.cw-marquee')) return; // already has one
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'cw-marquee';
+      wrapper.style.display = 'block';
+      wrapper.style.width = '100%';
+      wrapper.style.overflow = 'hidden';
+      wrapper.style.position = 'relative';
+
+      const track = document.createElement('div');
+      track.className = 'cw-marquee-track';
+      track.style.display = 'inline-block';
+      track.style.whiteSpace = 'nowrap';
+      track.style.position = 'relative';
+      track.style.left = '0';
+      track.style.willChange = 'transform';
+
+      const item = document.createElement('span');
+      item.className = 'cw-marquee-item';
+      item.style.display = 'inline-block';
+      item.style.whiteSpace = 'nowrap';
+      item.innerHTML = container.innerHTML;
+
+      const spacer = document.createElement('span');
+      spacer.style.display = 'inline-block';
+      spacer.style.width = '2rem';
+
+      const clone = item.cloneNode(true);
+
+      track.appendChild(item);
+      track.appendChild(spacer);
+      track.appendChild(clone);
+
+      wrapper.appendChild(track);
+      container.innerHTML = '';
+      container.appendChild(wrapper);
+
+      requestAnimationFrame(() => refreshMarquee(wrapper));
+    }
+
+    function refreshMarquee(wrapper) {
+      const track = wrapper.querySelector('.cw-marquee-track');
+      if (!track) return;
+      const firstItem = track.querySelector('.cw-marquee-item');
+      if (!firstItem) return;
+
+      const contentWidth = Math.ceil(firstItem.getBoundingClientRect().width + 1);
+      if (!contentWidth) return;
+
+      const prevStyle = wrapper._cwStyleTag;
+      if (prevStyle && prevStyle.parentNode) prevStyle.parentNode.removeChild(prevStyle);
+
+      const animName = 'cwMarquee_' + Math.random().toString(36).slice(2,9);
+      const pxPerSecond = 60;
+      const durationSec = Math.max(5, contentWidth / pxPerSecond);
+
+      const style = document.createElement('style');
+      style.textContent = `@keyframes ${animName} { from { transform: translateX(0); } to { transform: translateX(-${contentWidth}px); } }`;
+      wrapper._cwStyleTag = style;
+      try { root.appendChild(style); } catch (e) { document.head.appendChild(style); }
+
+      track.style.animation = `${animName} ${durationSec}s linear infinite`;
+      track.style.transform = 'translateX(0)';
+    }
+
+    function ensureMarquees() {
+      try {
+        // find candidate elements that have dark-gray computed color
+        const candidates = Array.from(root.querySelectorAll('*')).filter(el => {
+          try {
+            const cs = window.getComputedStyle(el);
+            if (!cs) return false;
+            const color = cs.color || cs.getPropertyValue('color');
+            return isDarkGrayColorString(color) && isOverflowing(el);
+          } catch (e) { return false; }
+        });
+
+        candidates.forEach(el => {
+          createMarquee(el);
+        });
+      } catch (e) {
+        console.warn('ensureMarquees error', e);
+      }
+    }
+
+    // Observe changes and re-run marquee detection
+    const marqueeObserver = new MutationObserver((mutations) => { ensureMarquees(); });
+    try { marqueeObserver.observe(root, { childList: true, subtree: true, characterData: true }); } catch (e) { marqueeObserver.observe(document.body, { childList: true, subtree: true, characterData: true }); }
+    // initial check (delayed slightly to let internals render)
+    setTimeout(ensureMarquees, 600);
   }
 
   // --- checking the operating system ---
