@@ -269,122 +269,77 @@
     
     // running an initial check on existing elements just in case
     root.querySelectorAll('*').forEach(swapInlineStyles);
+  }
 
-    // 6. Marquee for bottom dark-gray text when it overflows
-    // Helper: determine if a color string is a dark gray we care about
-    function parseRgbString(s) {
-      const m = String(s).match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-      if (!m) return null;
-      return [parseInt(m[1],10), parseInt(m[2],10), parseInt(m[3],10)];
-    }
+  // --------------------------------------------------------------------------
+  // NEW: Marquee Logic for the specific gray text div
+  // --------------------------------------------------------------------------
+  async function applyMarqueeLogic() {
+    await customElements.whenDefined('macrowave-player');
+    const player = document.querySelector('macrowave-player');
+    if (!player) return;
+    const root = player.shadowRoot || player;
 
-    function isDarkGrayColorString(s) {
-      const rgb = parseRgbString(s);
-      if (!rgb) return false;
-      const [r,g,b] = rgb;
-      // require near-equal components (it's gray), and fairly dark but not black
-      const eq = Math.abs(r-g) <= 12 && Math.abs(r-b) <= 12 && Math.abs(g-b) <= 12;
-      const dark = r >= 30 && r <= 110; // mid-dark range
-      return eq && dark;
-    }
+    // The logic to identify the div, check overflow, and apply <marquee>
+    const checkAndMarqueeDiv = (node) => {
+      // We look for divs with the specific style signature provided
+      if (node && node.tagName === 'DIV') {
+        const style = node.getAttribute('style') || "";
+        // Match specific parts of the style string to be sure
+        if (style.includes('color: rgb(136, 136, 136)') && style.includes('text-overflow: ellipsis')) {
+          
+          // Check if we already applied a marquee to avoid nesting or loops
+          if (node.querySelector('marquee')) return;
 
-    function isOverflowing(el) {
-      try { return el.scrollWidth > (el.clientWidth || el.offsetWidth) + 1; } catch (e) { return false; }
-    }
-
-    // Create marquee structure inside a container element
-    function createMarquee(container) {
-      if (!container) return;
-      if (container.querySelector('.cw-marquee')) return; // already has one
-
-      const wrapper = document.createElement('div');
-      wrapper.className = 'cw-marquee';
-      wrapper.style.display = 'block';
-      wrapper.style.width = '100%';
-      wrapper.style.overflow = 'hidden';
-      wrapper.style.position = 'relative';
-
-      const track = document.createElement('div');
-      track.className = 'cw-marquee-track';
-      track.style.display = 'inline-block';
-      track.style.whiteSpace = 'nowrap';
-      track.style.position = 'relative';
-      track.style.left = '0';
-      track.style.willChange = 'transform';
-
-      const item = document.createElement('span');
-      item.className = 'cw-marquee-item';
-      item.style.display = 'inline-block';
-      item.style.whiteSpace = 'nowrap';
-      item.innerHTML = container.innerHTML;
-
-      const spacer = document.createElement('span');
-      spacer.style.display = 'inline-block';
-      spacer.style.width = '2rem';
-
-      const clone = item.cloneNode(true);
-
-      track.appendChild(item);
-      track.appendChild(spacer);
-      track.appendChild(clone);
-
-      wrapper.appendChild(track);
-      container.innerHTML = '';
-      container.appendChild(wrapper);
-
-      requestAnimationFrame(() => refreshMarquee(wrapper));
-    }
-
-    function refreshMarquee(wrapper) {
-      const track = wrapper.querySelector('.cw-marquee-track');
-      if (!track) return;
-      const firstItem = track.querySelector('.cw-marquee-item');
-      if (!firstItem) return;
-
-      const contentWidth = Math.ceil(firstItem.getBoundingClientRect().width + 1);
-      if (!contentWidth) return;
-
-      const prevStyle = wrapper._cwStyleTag;
-      if (prevStyle && prevStyle.parentNode) prevStyle.parentNode.removeChild(prevStyle);
-
-      const animName = 'cwMarquee_' + Math.random().toString(36).slice(2,9);
-      const pxPerSecond = 60;
-      const durationSec = Math.max(5, contentWidth / pxPerSecond);
-
-      const style = document.createElement('style');
-      style.textContent = `@keyframes ${animName} { from { transform: translateX(0); } to { transform: translateX(-${contentWidth}px); } }`;
-      wrapper._cwStyleTag = style;
-      try { root.appendChild(style); } catch (e) { document.head.appendChild(style); }
-
-      track.style.animation = `${animName} ${durationSec}s linear infinite`;
-      track.style.transform = 'translateX(0)';
-    }
-
-    function ensureMarquees() {
-      try {
-        // find candidate elements that have dark-gray computed color
-        const candidates = Array.from(root.querySelectorAll('*')).filter(el => {
-          try {
-            const cs = window.getComputedStyle(el);
-            if (!cs) return false;
-            const color = cs.color || cs.getPropertyValue('color');
-            return isDarkGrayColorString(color) && isOverflowing(el);
-          } catch (e) { return false; }
-        });
-
-        candidates.forEach(el => {
-          createMarquee(el);
-        });
-      } catch (e) {
-        console.warn('ensureMarquees error', e);
+          // Check if content is actually cut off (overflowing)
+          if (node.scrollWidth > node.clientWidth) {
+            console.log("Found overflowing gray text div, converting to marquee...");
+            
+            // Capture the text content
+            const originalText = node.innerText;
+            
+            // Clear and replace with <marquee>
+            // We set the width to 100% to fill the parent
+            node.innerHTML = `<marquee behavior="scroll" scrollamount="3" style="width: 100%; color: inherit; font-family: inherit; font-size: inherit;">${originalText}</marquee>`;
+            
+            // Important: We need to override the parent's 'text-overflow: ellipsis' 
+            // so it doesn't try to cut off the marquee element itself.
+            node.style.textOverflow = 'clip';
+            node.style.whiteSpace = 'normal'; // Allow marquee to behave normally
+          }
+        }
       }
-    }
+    };
 
-    // Observe changes and re-run marquee detection
-    const marqueeObserver = new MutationObserver((mutations) => { ensureMarquees(); });
-    try { marqueeObserver.observe(root, { childList: true, subtree: true, characterData: true }); } catch (e) { marqueeObserver.observe(document.body, { childList: true, subtree: true, characterData: true }); }
-    // initial check (delayed slightly to let internals render)
-    setTimeout(ensureMarquees, 600);
+    // 1. Initial Scan
+    const initialDivs = root.querySelectorAll('div');
+    initialDivs.forEach(checkAndMarqueeDiv);
+
+    // 2. Watch for new elements (using MutationObserver)
+    const marqueeObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === 1) { // Element node
+              checkAndMarqueeDiv(node);
+              // Also check children of added node
+              if (node.querySelectorAll) {
+                node.querySelectorAll('div').forEach(checkAndMarqueeDiv);
+              }
+            }
+          });
+        }
+      });
+    });
+    marqueeObserver.observe(root, { childList: true, subtree: true });
+
+    // 3. Watch for screen size updates (Resize)
+    // If the screen resizes, the text might start overflowing.
+    window.addEventListener('resize', () => {
+      // Re-scan all potential divs
+      const divs = root.querySelectorAll('div');
+      divs.forEach(checkAndMarqueeDiv);
+    });
   }
 
   // --- checking the operating system ---
@@ -402,7 +357,8 @@
   // let's get this party started
   document.addEventListener('DOMContentLoaded', () => {
     checkOS();
-    applyMacrowaveOverrides();
+    applyMacrowaveOverrides(); // Original color logic
+    applyMarqueeLogic();       // New marquee logic
   });
 
 </script>
