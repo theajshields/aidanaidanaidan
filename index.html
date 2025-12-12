@@ -21,58 +21,184 @@
   body {
     margin: 0;
     min-height: 100vh;
-    
-    /* This centers the "main-container" in the middle of the screen */
     display: flex;
-    justify-content: center; 
-    align-items: center;     
-
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+    
     background-color: #000;
-    background: 
+    background:
       linear-gradient(0deg, rgba(0,0,0,1), rgba(51,10,9,1)),
       url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='7.76' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
   }
 
-  /* This new container stacks the player and the logo vertically */
+  .zoom-wrapper {
+    width: 100%;
+    max-width: 600px;
+    transform: scale(1);
+    transform-origin: top center;
+    transition: transform 0.3s ease-out;
+    min-height: 1px;
+  }
+
+  @media screen and (min-width: 1024px) {
+    .zoom-wrapper {
+      transform: scale(1.3);
+      margin-top: -30px; 
+      margin-bottom: -30px; 
+    }
+  }
+
   .main-container {
     display: flex;
-    flex-direction: column; /* Stacks items top to bottom */
-    align-items: center;    /* Centers them horizontally */
-    gap: 20px;              /* Adds space between player and logo */
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%; 
   }
 
+  /* making sure the player takes up space, even if the web component acts weird */
   macrowave-player {
+    display: block; 
     filter: contrast(100%) brightness(100%);
-    max-width: 90vw;
+    max-width: 100%;
+    width: 100%;
   }
 
-  /* Styles for the Apple Logo */
+  .app-badge-link {
+    transition: opacity 0.3s, visibility 0.3s;
+  }
+  
   .app-badge {
-    width: 100px;  /* Makes the logo smaller */
-    height: auto;  /* Maintains aspect ratio */
+    width: clamp(80px, 15vw, 150px);
+    height: auto;
     cursor: pointer;
     transition: opacity 0.2s;
   }
 
   .app-badge:hover {
-    opacity: 0.8; /* Slight fade effect on hover */
+    opacity: 0.8;
   }
 </style>
+
 </head>
 <body>
 
-  <div class="main-container">
-    
-    <macrowave-player
-      station="aidan/aidanaidanaidan"
-      theme="dark">
-    </macrowave-player>
-    <br>
-    <a href="https://apps.apple.com/app/apple-store/id6746954963?pt=123127751&ct=macrowave.co&mt=8" target="_blank">
-      <img class="app-badge" src="https://macrowave.co/images/app-store-badge.svg" alt="Download on the App Store">
-    </a>
+  <div class="zoom-wrapper"> 
+    <div class="main-container">
+      <macrowave-player
+        station="aidan/aidanaidanaidan"
+        theme="dark">
+      </macrowave-player>
 
+      <a id="appBadgeLink" class="app-badge-link" 
+        href="https://apps.apple.com/app/apple-store/id6746954963?pt=123127751&ct=macrowave.co&mt=8" target="_blank">
+        <img class="app-badge" src="https://macrowave.co/images/app-store-badge.svg" alt="Download on the App Store">
+      </a>
+    </div>
   </div>
+
+<script>
+  // --- config stuff ---
+  const TARGET_GREEN_RGB = 'rgb(106, 223, 71)';
+  const REPLACE_RED_RGB = 'rgb(188, 37, 36)';
+  const REPLACE_RED_HEX = '#bc2524';
+
+  // this css is super important! it gets injected inside the player's secret shadow dom
+  const SHADOW_STYLE_OVERRIDE = `
+    /* forcing all the green utility classes to be red, just in case */
+    [class*="text-[#6adf47]"], .text-\[\#6adf47\], .text-green-500 { color: ${REPLACE_RED_HEX} !important; }
+    
+    /* swapping background greens too */
+    [class*="bg-[#6adf47]"], .bg-\[\#6adf47\] { background-color: ${REPLACE_RED_HEX} !important; }
+    
+    /* and borders, because why not? */
+    [class*="border-[#6adf47]"], .border-\[\#6adf47\] { border-color: ${REPLACE_RED_HEX} !important; }
+    
+    /* one last attempt to catch any lingering green buttons */
+    button[style*="${TARGET_GREEN_RGB}"] { background-color: ${REPLACE_RED_HEX} !important; }
+  `;
+
+  async function applyMacrowaveOverrides() {
+    console.log("--- starting the color-swap mission ---");
+
+    // 1. waiting for the custom player element to actually load its definition
+    await customElements.whenDefined('macrowave-player');
+    
+    const player = document.querySelector('macrowave-player');
+    if (!player) {
+        console.error("uh oh, macrowave player element wasn't found!");
+        return;
+    }
+
+    // 2. grabbing the shadow dom (the player's hidden internal document) or just the player itself
+    const root = player.shadowRoot || player; 
+    console.log(player.shadowRoot ? "found the secret shadow root, let's go inside..." : "looks like a regular element, working here.");
+
+    // 3. injecting the custom red css directly into the player's internals
+    const styleTag = document.createElement('style');
+    styleTag.textContent = SHADOW_STYLE_OVERRIDE;
+    root.appendChild(styleTag);
+    console.log("injected the red css stylesheet successfully!");
+
+    // 4. this is the core function to swap those annoying inline rgb styles
+    const swapInlineStyles = (node) => {
+        if (node.nodeType !== 1) return; // skip text and comments
+        
+        const styleText = node.getAttribute('style');
+        if (styleText && styleText.includes(TARGET_GREEN_RGB)) {
+            // replacing all instances of the green rgb with the red rgb
+            const newStyle = styleText.replace(new RegExp(TARGET_GREEN_RGB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), REPLACE_RED_RGB);
+            node.setAttribute('style', newStyle);
+            console.log(`hacked the inline style on <${node.tagName}>. it's red now.`);
+        }
+    };
+
+    // 5. setting up the mutation observer (the 'security camera')
+    // this watches the player for elements being added or styles being changed dynamically
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach(node => {
+                    swapInlineStyles(node);
+                    if (node.querySelectorAll) {
+                        // gotta check all the new children too
+                        node.querySelectorAll('*').forEach(swapInlineStyles);
+                    }
+                });
+            } else if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                // if the style attribute changes on an existing element, swap it back to red
+                swapInlineStyles(mutation.target);
+            }
+        });
+    });
+
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+    
+    // running an initial check on existing elements just in case
+    root.querySelectorAll('*').forEach(swapInlineStyles);
+  }
+
+  // --- checking the operating system ---
+  function checkOS() {
+    const badgeLink = document.getElementById('appBadgeLink');
+    if (badgeLink) {
+        const userAgent = navigator.userAgent.toLowerCase();
+        // if it's not an apple device, hide the badge
+        if (!/iphone|ipad|ipod|macintosh/.test(userAgent)) {
+            badgeLink.style.display = 'none';
+        }
+    }
+  }
+
+  // let's get this party started
+  document.addEventListener('DOMContentLoaded', () => {
+    checkOS();
+    applyMacrowaveOverrides();
+  });
+
+</script>
 
 </body>
 </html>
